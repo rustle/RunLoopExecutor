@@ -4,14 +4,14 @@
 //  Copyright © 2017-2026 Doug Russell. All rights reserved.
 //
 
-import Atomics
 import Foundation
 import RunLoopExecutor
+import Synchronization
 
 // Rudimentary thread pool allocating via round-robin.
 public final class RunLoopExecutorFixedPool: Sendable {
     private let executors: [RunLoopExecutor]
-    private let index = ManagedAtomic<Int>(0)
+    private let index = Atomic<Int>(0)
 
     public init(
         name: String? = nil,
@@ -33,7 +33,7 @@ public final class RunLoopExecutorFixedPool: Sendable {
     }
 
     public func next() -> RunLoopExecutor {
-        let i = index.wrappingIncrementThenLoad(ordering: .relaxed)
+        let i = index.wrappingAdd(1, ordering: .relaxed).newValue
         return executors[i % executors.count]
     }
 }

@@ -6,7 +6,7 @@ let package = Package(
     name: "RunLoopExecutor",
     platforms: [
         .macOS(.v15),
-        .iOS(.v13)
+        .iOS(.v18)
     ],
     products: [
         .library(
@@ -18,12 +18,6 @@ let package = Package(
             targets: ["RunLoopExecutorPool"]
         ),
     ],
-    dependencies: [
-        .package(
-            url: "https://github.com/apple/swift-atomics.git",
-            .upToNextMajor(from: "1.2.0")
-        ),
-    ],
     targets: [
         .target(
             name: "RunLoopExecutor"
@@ -32,10 +26,6 @@ let package = Package(
             name: "RunLoopExecutorPool",
             dependencies: [
                 "RunLoopExecutor",
-                .product(
-                    name: "Atomics",
-                    package: "swift-atomics"
-                ),
             ]
         ),
         .testTarget(
