@@ -11,12 +11,15 @@ public extension Actor {
         let state = OSAllocatedUnfairLock<CheckedContinuation<Void, Error>?>(initialState: nil)
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                guard !Task.isCancelled else {
-                    continuation.resume(throwing: CancellationError())
-                    return
+                let shouldResumeImmediately = state.withLock { stored -> Bool in
+                    if Task.isCancelled {
+                        return true
+                    }
+                    stored = continuation
+                    return false
                 }
-                state.withLock {
-                    $0 = continuation
+                if shouldResumeImmediately {
+                    continuation.resume(throwing: CancellationError())
                 }
             }
         } onCancel: {
