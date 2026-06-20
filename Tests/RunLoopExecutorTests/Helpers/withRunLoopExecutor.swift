@@ -17,6 +17,9 @@ func withRunLoopExecutor(
         qualityOfService: qualityOfService
     )
     executor.start()
+    // defer so a throwing `body` still stops the executor; otherwise it would
+    // deinit while `.running` and trip the deinit precondition, crashing the
+    // test process and masking the original error.
+    defer { executor.stop() }
     try await body(executor)
-    executor.stop()
 }

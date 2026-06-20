@@ -1,5 +1,5 @@
 //
-//  AppExecutorPool.swift
+//  RunLoopExecutorDynamicPool.swift
 //
 //  Copyright © 2017-2026 Doug Russell. All rights reserved.
 //
@@ -8,15 +8,11 @@ import Foundation
 import os
 import RunLoopExecutor
 
-// Manages a pool of RunLoopExecutors that can grow (up to a limit).
-//
-// Executors are acquired for the duration of withRunLoopExecutor and
-// released automatically when the body returns or throws.
-//
-// The pool grows on demand up to `maximumWidth`. Once at maximumWidth,
-// withRunLoopExecutor provides the least-loaded active executor rather than
-// spawning a new thread. Released executors with no remaining users move to
-// the idle list for immediate reuse.
+/// Manages a pool of ``RunLoopExecutors`` that can grow (up to a limit).
+///
+/// Executors are acquired for the duration of ``withRunLoopExecutor()`` and released automatically when the body returns or throws.
+///
+/// The pool grows on demand up to `maximumWidth`. Once at maximumWidth, ``withRunLoopExecutor()`` provides the least-loaded active executor rather than spawning a new thread. Released executors with no remaining users move to the idle list for immediate reuse.
 public final class RunLoopExecutorDynamicPool: Sendable {
     private struct State {
         var idle: [RunLoopExecutor] = []

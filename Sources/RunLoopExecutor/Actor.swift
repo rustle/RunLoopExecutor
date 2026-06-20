@@ -7,6 +7,7 @@
 import os
 
 public extension Actor {
+    /// Park and wait for `Task.cancel()`
     static func suspendAwaitingThrow() async throws {
         let state = OSAllocatedUnfairLock<CheckedContinuation<Void, Error>?>(initialState: nil)
         try await withTaskCancellationHandler {

@@ -30,6 +30,24 @@ import RunLoopExecutor
         #expect(first == second)
     }
 
+    // Releasing a lease must NOT stop the executor — it returns to the idle
+    // list still running. Under the executor's lifecycle contract, enqueuing on
+    // a stopped executor traps, so if `release` ever stopped it the actor job in
+    // the second lease would crash. Reuse identity alone (above) wouldn't catch
+    // that; this runs a real job on the reused executor.
+    @Test func reusedIdleExecutorStillRunsJobsAfterRelease() async {
+        let pool = RunLoopExecutorDynamicPool(maximumWidth: 4)
+        let first = await pool.withRunLoopExecutor { executor in
+            await TestPoolActor(executor: executor).executorID()
+        }
+        let (second, ran) = await pool.withRunLoopExecutor { executor in
+            let actor = TestPoolActor(executor: executor)
+            return (await actor.executorID(), await actor.ping())
+        }
+        #expect(first == second)   // same executor, reused from idle
+        #expect(ran)               // ...and it still runs jobs after release
+    }
+
     @Test func growsUpToMaximumWidth() async {
         let maxWidth = 3
         let pool = RunLoopExecutorDynamicPool(maximumWidth: maxWidth)

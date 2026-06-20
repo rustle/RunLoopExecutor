@@ -9,6 +9,30 @@ import os
 import Testing
 @testable import RunLoopExecutor
 
+/// Actor pinned to a caller-supplied RunLoopExecutor.
+/// 
+/// Used to observe job execution and to drive stop() from the executor's own isolation domain.
+private actor PinnedActor {
+    nonisolated let executor: RunLoopExecutor
+    nonisolated var unownedExecutor: UnownedSerialExecutor {
+        executor.asUnownedSerialExecutor()
+    }
+    var count = 0
+    init(executor: RunLoopExecutor) {
+        self.executor = executor
+    }
+    func increment() {
+        count += 1
+    }
+    func value() -> Int {
+        count
+    }
+    // Calls stop() from the executor's own thread.
+    func stopExecutor() {
+        executor.stop()
+    }
+}
+
 @Suite struct RunLoopExecutorTests {
     // MARK: - Thread identity
 
@@ -124,5 +148,72 @@ import Testing
         #expect(myThread == theirThread)
 
         executor.stop()
+    }
+
+    // MARK: - Coalescing under burst load
+
+    // A large, fast burst exercises the wake coalescing: at most one `perform`
+    // hop is ever in flight, yet every job still runs. If wakeups were lost the
+    // total would come up short.
+    @Test func burstOfManyJobsAllRun() async {
+        await withRunLoopExecutor(name: "rlx-burst") { executor in
+            let actor = PinnedActor(executor: executor)
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<5_000 {
+                    group.addTask { await actor.increment() }
+                }
+            }
+            #expect(await actor.value() == 5_000)
+        }
+    }
+
+    // MARK: - Lifecycle precondition traps (verified via exit tests)
+
+    @Test func stopBeforeStartTraps() async {
+        await #expect(processExitsWith: .failure) {
+            let executor = RunLoopExecutor(name: "rlx-stop-before-start")
+            executor.stop()
+        }
+    }
+
+    @Test func doubleStopTraps() async {
+        await #expect(processExitsWith: .failure) {
+            let executor = RunLoopExecutor(name: "rlx-double-stop")
+            executor.start()
+            executor.stop()
+            executor.stop()
+        }
+    }
+
+    @Test func selfStopTraps() async {
+        await #expect(processExitsWith: .failure) {
+            let executor = RunLoopExecutor(name: "rlx-self-stop")
+            executor.start()
+            await PinnedActor(executor: executor).stopExecutor()
+        }
+    }
+
+    @Test func doubleStartTraps() async {
+        await #expect(processExitsWith: .failure) {
+            let executor = RunLoopExecutor(name: "rlx-double-start")
+            executor.start()
+            executor.start()
+        }
+    }
+
+    @Test func enqueueBeforeStartTraps() async {
+        await #expect(processExitsWith: .failure) {
+            let executor = RunLoopExecutor(name: "rlx-enqueue-before-start")
+            _ = await PinnedActor(executor: executor).value()   // enqueues before start()
+        }
+    }
+
+    @Test func enqueueAfterStopTraps() async {
+        await #expect(processExitsWith: .failure) {
+            let executor = RunLoopExecutor(name: "rlx-enqueue-after-stop")
+            executor.start()
+            executor.stop()
+            _ = await PinnedActor(executor: executor).value()   // enqueues after stop()
+        }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  RunLoopExecutorPool.swift
+//  RunLoopExecutorFixedPool.swift
 //
 //  Copyright © 2017-2026 Doug Russell. All rights reserved.
 //
@@ -8,7 +8,7 @@ import Foundation
 import RunLoopExecutor
 import Synchronization
 
-// Rudimentary thread pool allocating via round-robin.
+/// Rudimentary thread pool allocating via round-robin.
 public final class RunLoopExecutorFixedPool: Sendable {
     private let executors: [RunLoopExecutor]
     private let index = Atomic<Int>(0)
