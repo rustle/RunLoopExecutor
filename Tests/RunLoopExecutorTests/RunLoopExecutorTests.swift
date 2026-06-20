@@ -152,9 +152,9 @@ private actor PinnedActor {
 
     // MARK: - Coalescing under burst load
 
-    // A large, fast burst exercises the wake coalescing: at most one `perform`
-    // hop is ever in flight, yet every job still runs. If wakeups were lost the
-    // total would come up short.
+    // A large, fast burst exercises the wake coalescing: at most one source
+    // signal is ever in flight, yet every job still runs. If wakeups were lost
+    // the total would come up short.
     @Test func burstOfManyJobsAllRun() async {
         await withRunLoopExecutor(name: "rlx-burst") { executor in
             let actor = PinnedActor(executor: executor)

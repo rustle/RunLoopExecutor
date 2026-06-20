@@ -45,27 +45,18 @@ public final class RunLoopExecutor: SerialExecutor, Sendable {
     private static let drainCapacityLimit = 1024
 
     private let state = Mutex(State())
-    private nonisolated(unsafe) let thread: RunLoopThread
+    /// `internal` so the test suite can assert the run loop source is torn down
+    let waker: Waker
     private let didStopSignal = DispatchSemaphore(value: 0)
 
     public init(
         name: String? = nil,
         qualityOfService: QualityOfService? = nil
     ) {
-        thread = .init(
+        waker = Waker(
             name: name ?? "RunLoopExecutor",
             qualityOfService: qualityOfService ?? .default
         )
-        thread.eventHandler = { [unowned self] event in
-            switch event {
-            case let .threadID(threadID):
-                self.state.withLock { $0.threadID = threadID }
-            case .wake:
-                self.drainJobs()
-            case .didStop:
-                self.didStopSignal.signal()
-            }
-        }
     }
 
     deinit {
@@ -87,7 +78,16 @@ public final class RunLoopExecutor: SerialExecutor, Sendable {
             precondition(state.phase == .unstarted, "start() called more than once")
             state.phase = .running
         }
-        thread.start()
+        waker.start { [unowned self] event in
+            switch event {
+            case let .threadID(threadID):
+                self.state.withLock { $0.threadID = threadID }
+            case .wake:
+                self.drainJobs()
+            case .didStop:
+                self.didStopSignal.signal()
+            }
+        }
     }
 
     /// Stops the run-loop thread after draining already-enqueued jobs, then returns.
@@ -152,13 +152,7 @@ public final class RunLoopExecutor: SerialExecutor, Sendable {
     }
 
     private func wake() {
-        thread.perform(
-            #selector(RunLoopThread.wake),
-            on: thread,
-            with: nil,
-            waitUntilDone: false,
-            modes: [RunLoop.Mode.default.rawValue]
-        )
+        waker.wake()
     }
 
     public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
